@@ -7,14 +7,14 @@ $vnetAddressPrefix = "10.0.0.0/16"
 $subnetAddressPrefix = "10.0.0.0/24"
 $sshKeyName = "linuxboxsshkey"
 
-# Чтение ключа через переменную $HOME
+# Чтение ключа через $HOME, как в твоем терминале
 $sshKeyPublicKey = Get-Content "$HOME/.ssh/id_ed25519.pub"
 
 $publicIpAddressName = "linuxboxpip"
 $vmName = "matebox"
 $vmImage = "Ubuntu2204"
 
-# Размер по условию задачи
+# Размер по условию
 $vmSize = "Standard_B1s"
 $dnsLabel = "matetask" + (Get-Random -Count 1)
 
@@ -47,10 +47,14 @@ New-AzVm `
     -SshKeyName $sshKeyName `
     -PublicIpAddressName $publicIpAddressName
 
-# Установка расширения CustomScript (берет файл из твоего форка GitHub)
-# ВАЖНО: Убедись, что ты запушил install-app.sh в свой репозиторий перед запуском!
-$scriptUrl = "https://raw.githubusercontent.com"
+# --- РАБОТА С ЛОКАЛЬНЫМ СКРИПТОМ ---
+# Читаем твой локальный install-app.sh из корня текущей папки
+$scriptContent = Get-Content "./install-app.sh" -Raw
 
+# Кодируем содержимое в Base64, чтобы избежать проблем с кавычками и переносами строк в JSON
+$encodedScript = [Convert]::ToBase64String(::UTF8.GetBytes($scriptContent))
+
+# Выполняем скрипт на VM: декодируем и запускаем через bash
 Set-AzVMExtension `
     -ResourceGroupName $resourceGroupName `
     -VMName $vmName `
@@ -59,5 +63,5 @@ Set-AzVMExtension `
     -Publisher "Microsoft.Azure.Extensions" `
     -ExtensionType "CustomScript" `
     -TypeHandlerVersion "2.1" `
-    -SettingString "{'fileUris': ['$scriptUrl'], 'commandToExecute': 'bash install-app.sh'}"
+    -SettingString "{'commandToExecute': 'echo $encodedScript | base64 --decode | bash'}"
 
