@@ -7,15 +7,13 @@ $vnetAddressPrefix = "10.0.0.0/16"
 $subnetAddressPrefix = "10.0.0.0/24"
 $sshKeyName = "linuxboxsshkey"
 
-# Чтение ключа через $HOME, как в твоем терминале
+# Чтение твоего ключа ed25519
 $sshKeyPublicKey = Get-Content "$HOME/.ssh/id_ed25519.pub"
 
 $publicIpAddressName = "linuxboxpip"
 $vmName = "matebox"
 $vmImage = "Ubuntu2204"
-
-# Размер по условию
-$vmSize = "Standard_B1s"
+$vmSize = "Standard_D2s_v3"
 $dnsLabel = "matetask" + (Get-Random -Count 1)
 
 Write-Host "Creating a resource group $resourceGroupName ..."
@@ -31,10 +29,10 @@ New-AzVirtualNetwork -Name $virtualNetworkName -ResourceGroupName $resourceGroup
 
 New-AzSshKey -Name $sshKeyName -ResourceGroupName $resourceGroupName -PublicKey $sshKeyPublicKey
 
-# Исправлено для Швеции: Standard SKU и Static IP
+# Для Швеции ставим Standard SKU и Static (иначе упадет)
 New-AzPublicIpAddress -Name $publicIpAddressName -ResourceGroupName $resourceGroupName -Location $location -Sku Standard -AllocationMethod Static -DomainNameLabel $dnsLabel
 
-# Создание VM (запросит логин/пароль в терминале)
+# Создание VM (запросит Credential, введи любой логин/пароль)
 New-AzVm `
     -ResourceGroupName $resourceGroupName `
     -Name $vmName `
@@ -47,14 +45,9 @@ New-AzVm `
     -SshKeyName $sshKeyName `
     -PublicIpAddressName $publicIpAddressName
 
-# --- РАБОТА С ЛОКАЛЬНЫМ СКРИПТОМ ---
-# Читаем твой локальный install-app.sh из корня текущей папки
-$scriptContent = Get-Content "./install-app.sh" -Raw
+# ВОТ ТВОЯ ПРЯМАЯ ССЫЛКА НА ФАЙЛ:
+$scriptUrl = "https://github.com/goldbergnik1993-cloud/azure_task_12_deploy_app_with_vm_extention.git"
 
-# Кодируем содержимое в Base64, чтобы избежать проблем с кавычками и переносами строк в JSON
-$encodedScript = [Convert]::ToBase64String(::UTF8.GetBytes($scriptContent))
-
-# Выполняем скрипт на VM: декодируем и запускаем через bash
 Set-AzVMExtension `
     -ResourceGroupName $resourceGroupName `
     -VMName $vmName `
@@ -63,5 +56,5 @@ Set-AzVMExtension `
     -Publisher "Microsoft.Azure.Extensions" `
     -ExtensionType "CustomScript" `
     -TypeHandlerVersion "2.1" `
-    -SettingString "{'commandToExecute': 'echo $encodedScript | base64 --decode | bash'}"
+    -SettingString "{'fileUris': ['$scriptUrl'], 'commandToExecute': 'bash install-app.sh'}"
 
